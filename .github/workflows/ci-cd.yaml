@@ -87,16 +87,17 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up kubectl
       uses: azure/setup-kubectl@v3
       with:
         version: 'latest'
-    
+
     - name: Configure kubectl
-      uses: azure/k8s-set-context@v3
-      with:
-        kubeconfig: ${{ secrets.KUBE_CONFIG }}
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+        chmod 600 ~/.kube/config
     
     - name: Create namespace
       run: |
