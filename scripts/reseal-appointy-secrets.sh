@@ -23,6 +23,42 @@ require CLOUDINARY_NAME
 require CLOUDINARY_API_KEY
 require CLOUDINARY_SECRET_KEY
 
+MONGODB_URI_FOR_CLUSTER="$(python3 - <<'PY'
+import os
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+
+uri = os.environ["MONGODB_URI"].strip()
+parsed = urlparse(uri)
+
+host = parsed.hostname or ""
+if host in ("localhost", "127.0.0.1", "::1", ""):
+    host = "mongodb"
+
+netloc = host
+if parsed.port:
+    netloc = f"{netloc}:{parsed.port}"
+elif parsed.scheme.startswith("mongodb"):
+    netloc = f"{netloc}:27017"
+
+if parsed.username:
+    user = parsed.username
+    pwd = parsed.password or ""
+    netloc = f"{user}:{pwd}@{netloc}"
+
+query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+query.setdefault("authSource", "admin")
+rebuilt = urlunparse((
+    parsed.scheme or "mongodb",
+    netloc,
+    parsed.path,
+    parsed.params,
+    urlencode(query),
+    parsed.fragment
+))
+print(rebuilt)
+PY
+)"
+
 if ! command -v kubectl >/dev/null 2>&1; then
   echo "kubectl not found in PATH" >&2
   exit 1
@@ -41,7 +77,7 @@ trap 'rm -f "$tmp_secret" "$tmp_sealed"' EXIT
 kubectl create secret generic "${SECRET_NAME}" \
   -n "${NAMESPACE}" \
   --from-literal=mongodb-root-password="${MONGODB_ROOT_PASSWORD}" \
-  --from-literal=mongodb-uri="${MONGODB_URI}" \
+  --from-literal=mongodb-uri="${MONGODB_URI_FOR_CLUSTER}" \
   --from-literal=jwt-secret="${JWT_SECRET}" \
   --from-literal=admin-email="${ADMIN_EMAIL}" \
   --from-literal=admin-password="${ADMIN_PASSWORD}" \

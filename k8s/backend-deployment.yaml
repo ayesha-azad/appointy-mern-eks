@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: backend
-        image: DOCKER_USERNAME/appointy-backend:latest
+        image: ayeshaazad/appointy-backend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 4000

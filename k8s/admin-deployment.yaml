@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: admin
-        image: DOCKER_USERNAME/appointy-admin:latest
+        image: ayeshaazad/appointy-admin:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 80
