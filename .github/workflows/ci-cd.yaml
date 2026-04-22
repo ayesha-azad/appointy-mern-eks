@@ -143,8 +143,8 @@ jobs:
           type: gp3
           fsType: ext4
         EOF
-        # Remove default annotation from old gp2
-        kubectl annotate storageclass gp2 storageclass.kubernetes.io/is-default-class- --ignore-not-found=true
+        # Remove default annotation from old gp2 (ignore errors if it doesn't exist)
+        kubectl annotate storageclass gp2 storageclass.kubernetes.io/is-default-class- 2>/dev/null || true
 
     - name: Deploy MongoDB
       run: |
