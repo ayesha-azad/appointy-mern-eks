@@ -17,7 +17,25 @@ connectCloudinary()
 
 // middlewares
 app.use(express.json())
-app.use(cors())
+
+// CORS configuration
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:8080',
+  'https://appointy-h5sn.onrender.com',
+  process.env.FRONTEND_URL,
+  process.env.ADMIN_URL
+].filter(Boolean);
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'atoken', 'token', 'dtoken']
+}))
 
 // api endpoints
 app.use('/api/admin', adminRouter)
@@ -36,6 +54,26 @@ app.get('/test-db', (req, res) => {
     res.send('Database is connected');
   } else {
     res.status(500).send('Database is NOT connected');
+  }
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  // Check MongoDB connection
+  const isMongoConnected = mongoose.connection.readyState === 1;
+  
+  if (isMongoConnected) {
+    res.status(200).json({ 
+      status: 'healthy', 
+      database: 'connected',
+      timestamp: new Date().toISOString()
+    });
+  } else {
+    res.status(503).json({ 
+      status: 'unhealthy', 
+      database: 'disconnected',
+      timestamp: new Date().toISOString()
+    });
   }
 });
 

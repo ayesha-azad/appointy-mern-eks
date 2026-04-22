@@ -121,21 +121,88 @@ To set up and run this project locally:
 
 2. **Install Dependencies**:
    ```bash
-   npm install
-   cd client
-   npm install
+   # Install all dependencies for backend, frontend, and admin
+   cd backend && npm install
+   cd ../frontend && npm install
+   cd ../admin && npm install
+   cd ..
    ```
 
 3. **Environment Variables**:
-   - Create a `.env` file in the root directory and add the following:
-     ```env
-     MONGO_URI=your_mongodb_connection_string
-     JWT_SECRET=your_jwt_secret
-     STRIPE_API_KEY=your_stripe_api_key
-     RAZORPAY_API_KEY=your_razorpay_api_key
-     ```
+
+   This project requires environment files in **three main folders**: `backend`, `frontend`, and `admin`. Each folder has specific environment variables needed for its operation.
+
+   ### **Backend `.env` File** (`backend/.env`)
+   
+   Create a `.env` file in the `backend` folder with the following variables:
+   ```env
+   # MongoDB Configuration
+   MONGODB_URI=your_mongodb_connection_string_with_auth
+
+   # JWT Configuration
+   JWT_SECRET=your_secure_jwt_secret_key
+
+   # Cloudinary Configuration (for image uploads)
+   CLOUDINARY_NAME=your_cloudinary_cloud_name
+   CLOUDINARY_API_KEY=your_cloudinary_api_key
+   CLOUDINARY_SECRET_KEY=your_cloudinary_secret_key
+
+   # Admin Credentials
+   ADMIN_EMAIL=admin@appointy.com
+   ADMIN_PASSWORD=your_secure_admin_password
+
+   # Server Configuration
+   PORT=4000
+
+   # CORS Configuration URLs
+   FRONTEND_URL=http://localhost:5173
+   ADMIN_URL=http://localhost:5174
+   ```
+
+   ### **Frontend `.env` File** (`frontend/.env`)
+   
+   Create a `.env` file in the `frontend` folder with the following variables:
+   ```env
+   # Backend API Configuration
+   VITE_BACKEND_URL=http://localhost:4000
+   ```
+
+   ### **Admin `.env` File** (`admin/.env`)
+   
+   Create a `.env` file in the `admin` folder with the following variables:
+   ```env
+   # Backend API Configuration
+   VITE_BACKEND_URL=http://localhost:4000
+
+   # Currency Symbol (for display purposes)
+   VITE_CURRENCY=₹
+   ```
+
+   > **Note**: The `VITE_` prefix is required for frontend and admin variables as they use Vite's environment variable system. These variables are exposed to the client-side code.
 
 4. **Run the Application**:
+   
+   You can run all three applications together. In separate terminal windows:
+
+   ```bash
+   # Terminal 1: Backend (runs on http://localhost:4000)
+   cd backend
+   npm run server
+   ```
+
+   ```bash
+   # Terminal 2: Frontend (runs on http://localhost:5173)
+   cd frontend
+   npm run dev
+   ```
+
+   ```bash
+   # Terminal 3: Admin Panel (runs on http://localhost:5174)
+   cd admin
+   npm run dev
+   ```
+
+   Alternatively, if you have a root-level setup script, you can use:
    ```bash
    npm run dev
    ```
@@ -144,16 +211,46 @@ To set up and run this project locally:
 
 ```plaintext
 appointy/
-├── client/          # Frontend (React.js)
-├── server/          # Backend (Node.js, Express.js)
-├── models/          # MongoDB Schemas
-├── controllers/     # API Controllers
-├── routes/          # API Routes
-├── middleware/      # Authentication and Error Handling
-├── config/          # Configuration Files
-├── utils/           # Utility Functions
-├── public/          # Static Files
-└── .env             # Environment Variables
+├── backend/                    # Backend (Node.js, Express.js)
+│   ├── config/                # Configuration files (MongoDB, Cloudinary)
+│   ├── controllers/            # API Controllers (admin, doctor, user)
+│   ├── middlewares/            # Authentication & multer middleware
+│   ├── models/                # MongoDB models (appointment, doctor, user)
+│   ├── routes/                # API Routes
+│   ├── server.js              # Express server entry point
+│   ├── package.json           # Dependencies
+│   └── .env                   # Environment variables
+│
+├── frontend/                   # Frontend (React.js with Vite)
+│   ├── src/
+│   │   ├── components/        # React components
+│   │   ├── context/           # App context for state management
+│   │   ├── pages/             # Page components
+│   │   ├── assets/            # Images and assets
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── package.json           # Dependencies
+│   ├── vite.config.js         # Vite configuration
+│   ├── tailwind.config.js     # Tailwind CSS configuration
+│   └── .env                   # Environment variables
+│
+├── admin/                      # Admin Panel (React.js with Vite)
+│   ├── src/
+│   │   ├── components/        # Admin components
+│   │   ├── context/           # Admin context for state management
+│   │   ├── pages/             # Admin pages
+│   │   ├── assets/            # Images and assets
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   ├── package.json           # Dependencies
+│   ├── vite.config.js         # Vite configuration
+│   ├── tailwind.config.js     # Tailwind CSS configuration
+│   └── .env                   # Environment variables
+│
+├── k8s/                        # Kubernetes configuration files
+├── nginx/                      # Nginx configuration for reverse proxy
+├── docker-compose.yaml        # Docker Compose orchestration
+└── README.md                  # Project documentation
 ```
 
 ## 🤝 Contributing

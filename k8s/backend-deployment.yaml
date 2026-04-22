@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: appointy-backend
+  namespace: appointy
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: appointy-backend
+  template:
+    metadata:
+      labels:
+        app: appointy-backend
+    spec:
+      containers:
+      - name: backend
+        image: appointy-backend:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 4000
+        env:
+        - name: PORT
+          value: "4000"
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: appointy-secrets
+              key: mongodb-uri
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: appointy-secrets
+              key: jwt-secret
+        - name: ADMIN_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: appointy-secrets
+              key: admin-email
+        - name: ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: appointy-secrets
+              key: admin-password
+        - name: CLOUDINARY_NAME
+          valueFrom:
+            secretKeyRef:
+              name: appointy-secrets
+              key: cloudinary-name
+        - name: CLOUDINARY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: appointy-secrets
+              key: cloudinary-api-key
+        - name: CLOUDINARY_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: appointy-secrets
+              key: cloudinary-secret-key
+        - name: FRONTEND_URL
+          valueFrom:
+            configMapKeyRef:
+              name: appointy-config
+              key: frontend-url
+        - name: ADMIN_URL
+          valueFrom:
+            configMapKeyRef:
+              name: appointy-config
+              key: admin-url
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 4000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 30
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 4000
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          failureThreshold: 3
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 4000
+          initialDelaySeconds: 0
+          periodSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+          timeoutSeconds: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"

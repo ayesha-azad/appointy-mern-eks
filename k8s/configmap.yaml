@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: appointy-config
+  namespace: appointy
+data:
+  frontend-url: "http://appointy-frontend"
+  admin-url: "http://appointy-admin"
+  backend-port: "4000"

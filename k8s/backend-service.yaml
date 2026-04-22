@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: appointy-backend
+  namespace: appointy
+spec:
+  selector:
+    app: appointy-backend
+  ports:
+  - port: 4000
+    targetPort: 4000
