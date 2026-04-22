@@ -40,7 +40,7 @@ const Footer = () => {
       {/* Bottom Footer */}
       <hr className="border-gray-300" />
       <p className="py-4 text-sm text-center text-gray-600">
-        © 2025 appointy.in | CI/CD and Orchestration by Ayesha Azad — All Rights Reserved.
+        © 2025 appointy.in | CI/CD by Ayesha Azad — All Rights Reserved.
       </p>
     </div>
   );
