@@ -127,9 +127,15 @@ jobs:
         kubectl rollout status daemonset/ebs-csi-node -n kube-system --timeout=2m
         kubectl rollout status deployment/ebs-csi-controller -n kube-system --timeout=2m
 
-    - name: Create StorageClass
+    - name: Set default StorageClass
       run: |
-        cat <<EOF | kubectl apply -f -
+        # Check if gp2 StorageClass exists and set it as default
+        if kubectl get storageclass gp2 &>/dev/null; then
+          kubectl annotate storageclass gp2 storageclass.kubernetes.io/is-default-class=true --overwrite
+          echo "Using existing gp2 StorageClass"
+        else
+          # Create gp2 StorageClass if it doesn't exist
+          cat <<EOF | kubectl apply -f -
         apiVersion: storage.k8s.io/v1
         kind: StorageClass
         metadata:
@@ -143,6 +149,7 @@ jobs:
           type: gp3
           fsType: ext4
         EOF
+        fi
 
     - name: Deploy MongoDB
       run: |
