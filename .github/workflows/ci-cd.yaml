@@ -122,6 +122,11 @@ jobs:
     - name: Apply Sealed Secrets
       run: kubectl apply -f k8s/sealed-secrets.yaml
 
+    - name: Wait for decrypted Secret
+      run: |
+        kubectl wait --for=condition=Synced sealedsecret/appointy-secrets -n ${{ env.KUBE_NAMESPACE }} --timeout=180s || true
+        kubectl get secret appointy-secrets -n ${{ env.KUBE_NAMESPACE }}
+
     - name: Apply ConfigMap
       run: kubectl apply -f k8s/configmap.yaml
 
@@ -160,9 +165,18 @@ jobs:
         
         echo "Creating MongoDB resources..."
         kubectl apply -f k8s/mongodb.yaml
+        kubectl get statefulset mongodb -n ${{ env.KUBE_NAMESPACE }}
+        kubectl get pvc -n ${{ env.KUBE_NAMESPACE }}
         
         echo "Waiting for MongoDB to be ready..."
-        kubectl rollout status statefulset/mongodb -n ${{ env.KUBE_NAMESPACE }} --timeout=15m
+        kubectl rollout status statefulset/mongodb -n ${{ env.KUBE_NAMESPACE }} --timeout=15m || \
+          (echo "MongoDB rollout failed, collecting diagnostics..." && \
+          kubectl get pods -l app=mongodb -n ${{ env.KUBE_NAMESPACE }} -o wide && \
+          kubectl get pvc -n ${{ env.KUBE_NAMESPACE }} && \
+          kubectl describe statefulset mongodb -n ${{ env.KUBE_NAMESPACE }} && \
+          kubectl describe pods -l app=mongodb -n ${{ env.KUBE_NAMESPACE }} && \
+          kubectl get events -n ${{ env.KUBE_NAMESPACE }} --sort-by=.metadata.creationTimestamp | tail -n 120 && \
+          exit 1)
 
     - name: Deploy Backend
       run: |
