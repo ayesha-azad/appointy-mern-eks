@@ -105,11 +105,16 @@ jobs:
         mkdir -p ~/.kube
         echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
         chmod 600 ~/.kube/config
-    
+
     - name: Create namespace
       run: |
         kubectl create namespace ${{ env.KUBE_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
-    
+
+    - name: Install SealedSecrets Controller
+      run: |
+        kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.24.0/controller.yaml
+        kubectl rollout status deployment/sealed-secrets-controller -n kube-system --timeout=2m
+
     - name: Apply Sealed Secrets
       run: kubectl apply -f k8s/sealed-secrets.yaml
     
