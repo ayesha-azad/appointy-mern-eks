@@ -105,22 +105,50 @@ jobs:
 
     - name: Configure kubectl
       run: |
+        set -euo pipefail
         mkdir -p ~/.kube
         echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
         chmod 600 ~/.kube/config
 
+    - name: Validate required deploy secrets
+      env:
+        MONGODB_ROOT_PASSWORD: ${{ secrets.MONGODB_ROOT_PASSWORD }}
+        MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+        ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        CLOUDINARY_NAME: ${{ secrets.CLOUDINARY_NAME }}
+        CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+        CLOUDINARY_SECRET_KEY: ${{ secrets.CLOUDINARY_SECRET_KEY }}
+      run: |
+        set -euo pipefail
+        missing=0
+        for key in MONGODB_ROOT_PASSWORD MONGODB_URI JWT_SECRET ADMIN_EMAIL ADMIN_PASSWORD CLOUDINARY_NAME CLOUDINARY_API_KEY CLOUDINARY_SECRET_KEY; do
+          if [ -z "${!key:-}" ]; then
+            echo "Missing required GitHub secret: $key"
+            missing=1
+          fi
+        done
+        if [ "$missing" -ne 0 ]; then
+          exit 1
+        fi
+
     - name: Create namespace
       run: |
+        set -euo pipefail
         kubectl create namespace ${{ env.KUBE_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
 
     - name: Install SealedSecrets Controller
       run: |
+        set -euo pipefail
         kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.24.0/controller.yaml
         kubectl wait --for=condition=ready pod -l name=sealed-secrets-controller -n kube-system --timeout=300s || true
         kubectl rollout status deployment/sealed-secrets-controller -n kube-system --timeout=10m
 
     - name: Apply Sealed Secrets
-      run: kubectl apply -f k8s/sealed-secrets.yaml
+      run: |
+        set -euo pipefail
+        kubectl apply -f k8s/sealed-secrets.yaml || true
 
     - name: Verify or recover application Secret
       env:
@@ -133,6 +161,7 @@ jobs:
         CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
         CLOUDINARY_SECRET_KEY: ${{ secrets.CLOUDINARY_SECRET_KEY }}
       run: |
+        set -euo pipefail
         echo "Inspecting SealedSecret status..."
         kubectl get sealedsecret appointy-secrets -n ${{ env.KUBE_NAMESPACE }} -o yaml || true
         kubectl describe sealedsecret appointy-secrets -n ${{ env.KUBE_NAMESPACE }} || true
@@ -140,12 +169,12 @@ jobs:
         kubectl logs -n kube-system deploy/sealed-secrets-controller --tail=100 || true
 
         echo "Waiting for decrypted Secret to exist..."
-        for i in $(seq 1 18); do
+        for i in $(seq 1 6); do
           if kubectl get secret appointy-secrets -n ${{ env.KUBE_NAMESPACE }} >/dev/null 2>&1; then
             echo "appointy-secrets found."
             break
           fi
-          echo "Secret not ready yet (attempt $i/18), sleeping 10s..."
+          echo "Secret not ready yet (attempt $i/6), sleeping 10s..."
           sleep 10
         done
 
@@ -167,16 +196,20 @@ jobs:
         kubectl get secret appointy-secrets -n ${{ env.KUBE_NAMESPACE }}
 
     - name: Apply ConfigMap
-      run: kubectl apply -f k8s/configmap.yaml
+      run: |
+        set -euo pipefail
+        kubectl apply -f k8s/configmap.yaml
 
     - name: Install AWS EBS CSI Driver
       run: |
+        set -euo pipefail
         kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=release-1.33"
         kubectl rollout status daemonset/ebs-csi-node -n kube-system --timeout=10m
         kubectl rollout status deployment/ebs-csi-controller -n kube-system --timeout=10m
 
     - name: Create EBS CSI StorageClass
       run: |
+        set -euo pipefail
         cat <<EOF | kubectl apply -f -
         apiVersion: storage.k8s.io/v1
         kind: StorageClass
@@ -195,6 +228,7 @@ jobs:
 
     - name: Deploy MongoDB
       run: |
+        set -euo pipefail
         echo "Cleaning up existing MongoDB resources..."
         kubectl delete service mongodb -n ${{ env.KUBE_NAMESPACE }} --ignore-not-found=true
         kubectl delete statefulset mongodb -n ${{ env.KUBE_NAMESPACE }} --ignore-not-found=true
@@ -219,23 +253,32 @@ jobs:
 
     - name: Deploy Backend
       run: |
-        sed -i "s|DOCKER_USERNAME|${{ secrets.DOCKER_USERNAME }}|g" k8s/backend-deployment.yaml
+        set -euo pipefail
         kubectl apply -f k8s/backend-deployment.yaml
+        kubectl set image deployment/appointy-backend \
+          backend=${{ secrets.DOCKER_USERNAME }}/appointy-backend:${{ env.IMAGE_TAG }} \
+          -n ${{ env.KUBE_NAMESPACE }}
         kubectl apply -f k8s/backend-service.yaml
         kubectl rollout status deployment/appointy-backend -n ${{ env.KUBE_NAMESPACE }} --timeout=15m || \
           (kubectl rollout undo deployment/appointy-backend -n ${{ env.KUBE_NAMESPACE }} && exit 1)
 
     - name: Deploy Frontend
       run: |
-        sed -i "s|DOCKER_USERNAME|${{ secrets.DOCKER_USERNAME }}|g" k8s/frontend-deployment.yaml
+        set -euo pipefail
         kubectl apply -f k8s/frontend-deployment.yaml
+        kubectl set image deployment/appointy-frontend \
+          frontend=${{ secrets.DOCKER_USERNAME }}/appointy-frontend:${{ env.IMAGE_TAG }} \
+          -n ${{ env.KUBE_NAMESPACE }}
         kubectl rollout status deployment/appointy-frontend -n ${{ env.KUBE_NAMESPACE }} --timeout=10m || \
           (kubectl rollout undo deployment/appointy-frontend -n ${{ env.KUBE_NAMESPACE }} && exit 1)
 
     - name: Deploy Admin
       run: |
-        sed -i "s|DOCKER_USERNAME|${{ secrets.DOCKER_USERNAME }}|g" k8s/admin-deployment.yaml
+        set -euo pipefail
         kubectl apply -f k8s/admin-deployment.yaml
+        kubectl set image deployment/appointy-admin \
+          admin=${{ secrets.DOCKER_USERNAME }}/appointy-admin:${{ env.IMAGE_TAG }} \
+          -n ${{ env.KUBE_NAMESPACE }}
         kubectl rollout status deployment/appointy-admin -n ${{ env.KUBE_NAMESPACE }} --timeout=10m || \
           (kubectl rollout undo deployment/appointy-admin -n ${{ env.KUBE_NAMESPACE }} && exit 1)
     
