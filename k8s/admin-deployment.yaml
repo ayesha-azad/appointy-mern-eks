@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: admin
-        image: ${DOCKER_USERNAME}/appointy-admin:latest
+        image: DOCKER_USERNAME/appointy-admin:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 80
@@ -28,25 +28,25 @@ spec:
           httpGet:
             path: /
             port: 80
-          initialDelaySeconds: 5
-          periodSeconds: 5
-          failureThreshold: 6
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          failureThreshold: 30
         livenessProbe:
           httpGet:
             path: /
             port: 80
           initialDelaySeconds: 0
-          periodSeconds: 10
-          failureThreshold: 3
-          timeoutSeconds: 5
+          periodSeconds: 20
+          failureThreshold: 5
+          timeoutSeconds: 10
         readinessProbe:
           httpGet:
             path: /
             port: 80
           initialDelaySeconds: 0
-          periodSeconds: 5
-          failureThreshold: 2
-          timeoutSeconds: 3
+          periodSeconds: 10
+          failureThreshold: 5
+          timeoutSeconds: 10
         resources:
           requests:
             memory: "64Mi"
