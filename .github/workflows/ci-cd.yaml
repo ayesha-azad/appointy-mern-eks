@@ -117,10 +117,33 @@ jobs:
 
     - name: Apply Sealed Secrets
       run: kubectl apply -f k8s/sealed-secrets.yaml
-    
+
     - name: Apply ConfigMap
       run: kubectl apply -f k8s/configmap.yaml
-    
+
+    - name: Install AWS EBS CSI Driver
+      run: |
+        kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=release-1.33"
+        kubectl rollout status daemonset/ebs-csi-node -n kube-system --timeout=2m
+        kubectl rollout status deployment/ebs-csi-controller -n kube-system --timeout=2m
+
+    - name: Create StorageClass
+      run: |
+        cat <<EOF | kubectl apply -f -
+        apiVersion: storage.k8s.io/v1
+        kind: StorageClass
+        metadata:
+          name: gp2
+          annotations:
+            storageclass.kubernetes.io/is-default-class: "true"
+        provisioner: ebs.csi.aws.com
+        volumeBindingMode: WaitForFirstConsumer
+        allowVolumeExpansion: true
+        parameters:
+          type: gp3
+          fsType: ext4
+        EOF
+
     - name: Deploy MongoDB
       run: |
         kubectl apply -f k8s/mongodb.yaml
