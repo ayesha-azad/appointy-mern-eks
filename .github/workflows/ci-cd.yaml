@@ -122,9 +122,48 @@ jobs:
     - name: Apply Sealed Secrets
       run: kubectl apply -f k8s/sealed-secrets.yaml
 
-    - name: Wait for decrypted Secret
+    - name: Verify or recover application Secret
+      env:
+        MONGODB_ROOT_PASSWORD: ${{ secrets.MONGODB_ROOT_PASSWORD }}
+        MONGODB_URI: ${{ secrets.MONGODB_URI }}
+        JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+        ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        CLOUDINARY_NAME: ${{ secrets.CLOUDINARY_NAME }}
+        CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+        CLOUDINARY_SECRET_KEY: ${{ secrets.CLOUDINARY_SECRET_KEY }}
       run: |
-        kubectl wait --for=condition=Synced sealedsecret/appointy-secrets -n ${{ env.KUBE_NAMESPACE }} --timeout=180s || true
+        echo "Inspecting SealedSecret status..."
+        kubectl get sealedsecret appointy-secrets -n ${{ env.KUBE_NAMESPACE }} -o yaml || true
+        kubectl describe sealedsecret appointy-secrets -n ${{ env.KUBE_NAMESPACE }} || true
+        kubectl get pods -n kube-system -l name=sealed-secrets-controller -o wide || true
+        kubectl logs -n kube-system deploy/sealed-secrets-controller --tail=100 || true
+
+        echo "Waiting for decrypted Secret to exist..."
+        for i in $(seq 1 18); do
+          if kubectl get secret appointy-secrets -n ${{ env.KUBE_NAMESPACE }} >/dev/null 2>&1; then
+            echo "appointy-secrets found."
+            break
+          fi
+          echo "Secret not ready yet (attempt $i/18), sleeping 10s..."
+          sleep 10
+        done
+
+        if ! kubectl get secret appointy-secrets -n ${{ env.KUBE_NAMESPACE }} >/dev/null 2>&1; then
+          echo "SealedSecret decryption did not produce appointy-secrets. Creating fallback Secret from GitHub Secrets..."
+          kubectl create secret generic appointy-secrets \
+            -n ${{ env.KUBE_NAMESPACE }} \
+            --from-literal=mongodb-root-password="${MONGODB_ROOT_PASSWORD}" \
+            --from-literal=mongodb-uri="${MONGODB_URI}" \
+            --from-literal=jwt-secret="${JWT_SECRET}" \
+            --from-literal=admin-email="${ADMIN_EMAIL}" \
+            --from-literal=admin-password="${ADMIN_PASSWORD}" \
+            --from-literal=cloudinary-name="${CLOUDINARY_NAME}" \
+            --from-literal=cloudinary-api-key="${CLOUDINARY_API_KEY}" \
+            --from-literal=cloudinary-secret-key="${CLOUDINARY_SECRET_KEY}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+        fi
+
         kubectl get secret appointy-secrets -n ${{ env.KUBE_NAMESPACE }}
 
     - name: Apply ConfigMap
