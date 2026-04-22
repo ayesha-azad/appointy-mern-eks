@@ -110,29 +110,6 @@ jobs:
         echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
         chmod 600 ~/.kube/config
 
-    - name: Validate required deploy secrets
-      env:
-        MONGODB_ROOT_PASSWORD: ${{ secrets.MONGODB_ROOT_PASSWORD }}
-        MONGODB_URI: ${{ secrets.MONGODB_URI }}
-        JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
-        ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-        CLOUDINARY_NAME: ${{ secrets.CLOUDINARY_NAME }}
-        CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
-        CLOUDINARY_SECRET_KEY: ${{ secrets.CLOUDINARY_SECRET_KEY }}
-      run: |
-        set -euo pipefail
-        missing=0
-        for key in MONGODB_ROOT_PASSWORD MONGODB_URI JWT_SECRET ADMIN_EMAIL ADMIN_PASSWORD CLOUDINARY_NAME CLOUDINARY_API_KEY CLOUDINARY_SECRET_KEY; do
-          if [ -z "${!key:-}" ]; then
-            echo "Missing required GitHub secret: $key"
-            missing=1
-          fi
-        done
-        if [ "$missing" -ne 0 ]; then
-          exit 1
-        fi
-
     - name: Create namespace
       run: |
         set -euo pipefail
@@ -148,6 +125,8 @@ jobs:
     - name: Apply Sealed Secrets
       run: |
         set -euo pipefail
+        # Clean up legacy manually-created secret so SealedSecret can own it.
+        kubectl delete secret appointy-secrets -n ${{ env.KUBE_NAMESPACE }} --ignore-not-found=true
         kubectl apply -f k8s/sealed-secrets.yaml || true
 
     - name: Verify or recover application Secret
@@ -179,18 +158,25 @@ jobs:
         done
 
         if ! kubectl get secret appointy-secrets -n ${{ env.KUBE_NAMESPACE }} >/dev/null 2>&1; then
-          echo "SealedSecret decryption did not produce appointy-secrets. Creating fallback Secret from GitHub Secrets..."
-          kubectl create secret generic appointy-secrets \
-            -n ${{ env.KUBE_NAMESPACE }} \
-            --from-literal=mongodb-root-password="${MONGODB_ROOT_PASSWORD}" \
-            --from-literal=mongodb-uri="${MONGODB_URI}" \
-            --from-literal=jwt-secret="${JWT_SECRET}" \
-            --from-literal=admin-email="${ADMIN_EMAIL}" \
-            --from-literal=admin-password="${ADMIN_PASSWORD}" \
-            --from-literal=cloudinary-name="${CLOUDINARY_NAME}" \
-            --from-literal=cloudinary-api-key="${CLOUDINARY_API_KEY}" \
-            --from-literal=cloudinary-secret-key="${CLOUDINARY_SECRET_KEY}" \
-            --dry-run=client -o yaml | kubectl apply -f -
+          if [ -n "${MONGODB_ROOT_PASSWORD:-}" ] && [ -n "${MONGODB_URI:-}" ] && [ -n "${JWT_SECRET:-}" ] && \
+             [ -n "${ADMIN_EMAIL:-}" ] && [ -n "${ADMIN_PASSWORD:-}" ] && [ -n "${CLOUDINARY_NAME:-}" ] && \
+             [ -n "${CLOUDINARY_API_KEY:-}" ] && [ -n "${CLOUDINARY_SECRET_KEY:-}" ]; then
+            echo "SealedSecret decryption did not produce appointy-secrets. Creating fallback Secret from GitHub Secrets..."
+            kubectl create secret generic appointy-secrets \
+              -n ${{ env.KUBE_NAMESPACE }} \
+              --from-literal=mongodb-root-password="${MONGODB_ROOT_PASSWORD}" \
+              --from-literal=mongodb-uri="${MONGODB_URI}" \
+              --from-literal=jwt-secret="${JWT_SECRET}" \
+              --from-literal=admin-email="${ADMIN_EMAIL}" \
+              --from-literal=admin-password="${ADMIN_PASSWORD}" \
+              --from-literal=cloudinary-name="${CLOUDINARY_NAME}" \
+              --from-literal=cloudinary-api-key="${CLOUDINARY_API_KEY}" \
+              --from-literal=cloudinary-secret-key="${CLOUDINARY_SECRET_KEY}" \
+              --dry-run=client -o yaml | kubectl apply -f -
+          else
+            echo "ERROR: appointy-secrets was not created by SealedSecrets, and fallback GitHub secrets are not fully set."
+            exit 1
+          fi
         fi
 
         kubectl get secret appointy-secrets -n ${{ env.KUBE_NAMESPACE }}
