@@ -148,15 +148,21 @@ jobs:
 
     - name: Deploy MongoDB
       run: |
-        # Delete existing StatefulSet if it exists (needed for spec changes)
-        if kubectl get statefulset mongodb -n ${{ env.KUBE_NAMESPACE }} &>/dev/null; then
-          echo "MongoDB StatefulSet exists, deleting for update..."
-          kubectl delete statefulset mongodb -n ${{ env.KUBE_NAMESPACE }}
-          kubectl wait --for=delete pod -l app=mongodb -n ${{ env.KUBE_NAMESPACE }} --timeout=60s || true
-        fi
+        # Delete existing Service and StatefulSet if they exist
+        echo "Cleaning up existing MongoDB resources..."
+        kubectl delete service mongodb -n ${{ env.KUBE_NAMESPACE }} --ignore-not-found=true
+        kubectl delete statefulset mongodb -n ${{ env.KUBE_NAMESPACE }} --ignore-not-found=true
+        
+        # Wait for pods to terminate
+        echo "Waiting for MongoDB pod to terminate..."
+        kubectl wait --for=delete pod -l app=mongodb -n ${{ env.KUBE_NAMESPACE }} --timeout=60s || true
         
         # Apply MongoDB configuration
+        echo "Creating MongoDB resources..."
         kubectl apply -f k8s/mongodb.yaml
+        
+        # Wait for StatefulSet to be ready
+        echo "Waiting for MongoDB to be ready..."
         kubectl rollout status statefulset/mongodb -n ${{ env.KUBE_NAMESPACE }} --timeout=5m
 
     - name: Deploy Backend
