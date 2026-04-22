@@ -267,6 +267,32 @@ jobs:
           -n ${{ env.KUBE_NAMESPACE }}
         kubectl rollout status deployment/appointy-admin -n ${{ env.KUBE_NAMESPACE }} --timeout=10m || \
           (kubectl rollout undo deployment/appointy-admin -n ${{ env.KUBE_NAMESPACE }} && exit 1)
+
+    - name: Deploy Ingress (ALB)
+      run: |
+        set -euo pipefail
+        kubectl apply -f k8s/ingress.yaml
+
+        # Wait for an ALB address to be assigned to the ingress.
+        for i in $(seq 1 30); do
+          INGRESS_ADDRESS=$(kubectl get ingress appointy-ingress -n ${{ env.KUBE_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+          if [ -n "${INGRESS_ADDRESS:-}" ]; then
+            echo "Ingress address assigned: ${INGRESS_ADDRESS}"
+            break
+          fi
+          echo "Ingress address not assigned yet (attempt $i/30), sleeping 10s..."
+          sleep 10
+        done
+
+        if [ -z "${INGRESS_ADDRESS:-}" ]; then
+          echo "ERROR: Ingress address was not assigned in time."
+          echo "Collecting ingress diagnostics..."
+          kubectl get ingress appointy-ingress -n ${{ env.KUBE_NAMESPACE }} -o wide || true
+          kubectl describe ingress appointy-ingress -n ${{ env.KUBE_NAMESPACE }} || true
+          kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller -o wide || true
+          kubectl logs -n kube-system deployment/aws-load-balancer-controller --tail=200 || true
+          exit 1
+        fi
     
     - name: Verify deployment
       run: |
@@ -275,6 +301,11 @@ jobs:
         echo ""
         echo "=== Services ==="
         kubectl get svc -n ${{ env.KUBE_NAMESPACE }}
+        echo ""
+        echo "=== Ingress ==="
+        kubectl get ingress -n ${{ env.KUBE_NAMESPACE }} -o wide
+        echo ""
+        kubectl describe ingress appointy-ingress -n ${{ env.KUBE_NAMESPACE }} || true
         echo ""
         echo "=== PVCs ==="
         kubectl get pvc -n ${{ env.KUBE_NAMESPACE }}

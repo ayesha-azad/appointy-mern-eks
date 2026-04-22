@@ -61,7 +61,6 @@ metadata:
   name: appointy-admin
   namespace: appointy
 spec:
-  type: LoadBalancer
   selector:
     app: appointy-admin
   ports:
