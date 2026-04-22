@@ -127,19 +127,13 @@ jobs:
         kubectl rollout status daemonset/ebs-csi-node -n kube-system --timeout=2m
         kubectl rollout status deployment/ebs-csi-controller -n kube-system --timeout=2m
 
-    - name: Set default StorageClass
+    - name: Create EBS CSI StorageClass
       run: |
-        # Check if gp2 StorageClass exists and set it as default
-        if kubectl get storageclass gp2 &>/dev/null; then
-          kubectl annotate storageclass gp2 storageclass.kubernetes.io/is-default-class=true --overwrite
-          echo "Using existing gp2 StorageClass"
-        else
-          # Create gp2 StorageClass if it doesn't exist
-          cat <<EOF | kubectl apply -f -
+        cat <<EOF | kubectl apply -f -
         apiVersion: storage.k8s.io/v1
         kind: StorageClass
         metadata:
-          name: gp2
+          name: gp3-csi
           annotations:
             storageclass.kubernetes.io/is-default-class: "true"
         provisioner: ebs.csi.aws.com
@@ -149,7 +143,8 @@ jobs:
           type: gp3
           fsType: ext4
         EOF
-        fi
+        # Remove default annotation from old gp2
+        kubectl annotate storageclass gp2 storageclass.kubernetes.io/is-default-class- --ignore-not-found=true
 
     - name: Deploy MongoDB
       run: |
@@ -158,38 +153,25 @@ jobs:
 
     - name: Deploy Backend
       run: |
-        kubectl set image deployment/appointy-backend \
-          backend=${{ secrets.DOCKER_USERNAME }}/appointy-backend:${{ env.IMAGE_TAG }} \
-          -n ${{ env.KUBE_NAMESPACE }} || \
+        sed -i "s|\${DOCKER_USERNAME}|${{ secrets.DOCKER_USERNAME }}|g" k8s/backend-deployment.yaml
         kubectl apply -f k8s/backend-deployment.yaml
-        
         kubectl apply -f k8s/backend-service.yaml
-        
-        kubectl rollout status deployment/appointy-backend \
-          -n ${{ env.KUBE_NAMESPACE }} --timeout=15m || \
-        (kubectl rollout undo deployment/appointy-backend -n ${{ env.KUBE_NAMESPACE }} && exit 1)
+        kubectl rollout status deployment/appointy-backend -n ${{ env.KUBE_NAMESPACE }} --timeout=15m || \
+          (kubectl rollout undo deployment/appointy-backend -n ${{ env.KUBE_NAMESPACE }} && exit 1)
 
     - name: Deploy Frontend
       run: |
-        kubectl set image deployment/appointy-frontend \
-          frontend=${{ secrets.DOCKER_USERNAME }}/appointy-frontend:${{ env.IMAGE_TAG }} \
-          -n ${{ env.KUBE_NAMESPACE }} || \
+        sed -i "s|\${DOCKER_USERNAME}|${{ secrets.DOCKER_USERNAME }}|g" k8s/frontend-deployment.yaml
         kubectl apply -f k8s/frontend-deployment.yaml
-
-        kubectl rollout status deployment/appointy-frontend \
-          -n ${{ env.KUBE_NAMESPACE }} --timeout=15m || \
-        (kubectl rollout undo deployment/appointy-frontend -n ${{ env.KUBE_NAMESPACE }} && exit 1)
+        kubectl rollout status deployment/appointy-frontend -n ${{ env.KUBE_NAMESPACE }} --timeout=15m || \
+          (kubectl rollout undo deployment/appointy-frontend -n ${{ env.KUBE_NAMESPACE }} && exit 1)
 
     - name: Deploy Admin
       run: |
-        kubectl set image deployment/appointy-admin \
-          admin=${{ secrets.DOCKER_USERNAME }}/appointy-admin:${{ env.IMAGE_TAG }} \
-          -n ${{ env.KUBE_NAMESPACE }} || \
+        sed -i "s|\${DOCKER_USERNAME}|${{ secrets.DOCKER_USERNAME }}|g" k8s/admin-deployment.yaml
         kubectl apply -f k8s/admin-deployment.yaml
-
-        kubectl rollout status deployment/appointy-admin \
-          -n ${{ env.KUBE_NAMESPACE }} --timeout=15m || \
-        (kubectl rollout undo deployment/appointy-admin -n ${{ env.KUBE_NAMESPACE }} && exit 1)
+        kubectl rollout status deployment/appointy-admin -n ${{ env.KUBE_NAMESPACE }} --timeout=15m || \
+          (kubectl rollout undo deployment/appointy-admin -n ${{ env.KUBE_NAMESPACE }} && exit 1)
     
     - name: Verify deployment
       run: |

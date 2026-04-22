@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: appointy-frontend:latest
+        image: ${DOCKER_USERNAME}/appointy-frontend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 80

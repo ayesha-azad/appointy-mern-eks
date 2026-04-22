@@ -44,7 +44,7 @@ services:
     restart: always
     ports:
       - "3000:80"    # Frontend
-      - "3001:8080"  # Admin panel
+      - "3001:8080"  # Admin panel 
     depends_on:
       - appointy-backend
     networks:
