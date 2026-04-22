@@ -152,8 +152,10 @@ jobs:
         fi
 
     - name: Deploy MongoDB
-      run: kubectl apply -f k8s/mongodb.yaml
-    
+      run: |
+        kubectl apply -f k8s/mongodb.yaml
+        kubectl rollout status statefulset/mongodb -n ${{ env.KUBE_NAMESPACE }} --timeout=15m
+
     - name: Deploy Backend
       run: |
         kubectl set image deployment/appointy-backend \
@@ -164,29 +166,29 @@ jobs:
         kubectl apply -f k8s/backend-service.yaml
         
         kubectl rollout status deployment/appointy-backend \
-          -n ${{ env.KUBE_NAMESPACE }} --timeout=5m || \
+          -n ${{ env.KUBE_NAMESPACE }} --timeout=15m || \
         (kubectl rollout undo deployment/appointy-backend -n ${{ env.KUBE_NAMESPACE }} && exit 1)
-    
+
     - name: Deploy Frontend
       run: |
         kubectl set image deployment/appointy-frontend \
           frontend=${{ secrets.DOCKER_USERNAME }}/appointy-frontend:${{ env.IMAGE_TAG }} \
           -n ${{ env.KUBE_NAMESPACE }} || \
         kubectl apply -f k8s/frontend-deployment.yaml
-        
+
         kubectl rollout status deployment/appointy-frontend \
-          -n ${{ env.KUBE_NAMESPACE }} --timeout=2m || \
+          -n ${{ env.KUBE_NAMESPACE }} --timeout=15m || \
         (kubectl rollout undo deployment/appointy-frontend -n ${{ env.KUBE_NAMESPACE }} && exit 1)
-    
+
     - name: Deploy Admin
       run: |
         kubectl set image deployment/appointy-admin \
           admin=${{ secrets.DOCKER_USERNAME }}/appointy-admin:${{ env.IMAGE_TAG }} \
           -n ${{ env.KUBE_NAMESPACE }} || \
         kubectl apply -f k8s/admin-deployment.yaml
-        
+
         kubectl rollout status deployment/appointy-admin \
-          -n ${{ env.KUBE_NAMESPACE }} --timeout=2m || \
+          -n ${{ env.KUBE_NAMESPACE }} --timeout=15m || \
         (kubectl rollout undo deployment/appointy-admin -n ${{ env.KUBE_NAMESPACE }} && exit 1)
     
     - name: Verify deployment
